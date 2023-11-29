@@ -1,0 +1,24 @@
+---
+title: "Motility Lab Notebook"
+author: "sophiaaredas"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+### Notebook Description
+
+So this is my online lab notebook for the motility assay. There will also be a physical copy as well that is both mine and Ri's. The purpose of this experiment is to see if motility matters for aphid infection. We have Pseudomonas strains that are WT and KO for motility.
+
+This is a continuation of Ri's project. They had completed 3 replicates: the first didnt work, the second the aphids starved bc they didnt want to eat, but the third replicate worked. We will be going with the parameters from the third replicate.
+
+Ri's data is located in the data/ of this repo as a .csv file called "Aphid_FlagK_infected_diet_Mariah.csv"
+
+### Experimental Design
+According to Ri's results from the third replicate used 18 hours as an exposure period which appeared to be a sweet spot (previously 24 hours was used)
+
+### 11/29/2023
+#### Purpose
+To prepare for Tuesday's (12/5) first experiment for aphid infection assay
+
+#### Reviewing Ri's previous results
+Based on the "Aphid_FlagK_infected_diet_Mariah.csv" file 
