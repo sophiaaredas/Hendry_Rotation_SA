@@ -1,0 +1,208 @@
+---
+title: "Acinetobacter Lab Notebook"
+author: "Sophia Aredas"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    code_folding: show
+    highlight: default
+    keep_md: yes
+    theme: journal
+    toc: yes
+    toc_float:
+      collapsed: no
+      smooth_scroll: yes
+      toc_depth: 3
+  pdf_document:
+    toc: yes
+editor_options:
+  chunk_output_type: console
+---
+
+```{=html}
+<style>
+pre code, pre, code {
+  white-space: pre !important;
+  overflow-x: scroll !important;
+  word-break: keep-all !important;
+  word-wrap: initial !important;
+}
+</style>
+```
+```{r}
+# For width of code chunks and scroll bar
+knitr::opts_chunk$set(eval = TRUE,
+                      echo = TRUE,
+                      include = TRUE,
+                      warning = FALSE,
+                      collapse = FALSE,
+                      message = FALSE,
+                      dpi=200, dev = "png",
+                      error = TRUE,
+                      fig.path="figures/",
+                      fig.align = "center")
+
+```
+
+```{r load-packages}
+# Efficiently load packages
+pacman::p_load(readr, stringr, tidyr, tidyverse, dplyr, ggplot2, tidytext, scales, wesanderson, ggpubr, wacolors, rcartocolor, treeio, ggtreeExtra, phyloseq, ggtree, ggstar, phytools, install = FALSE)
+
+```
+
+### 11/22/2023
+
+#### So I am working from Vivi's unfinished work to do the metagenomics of Acinetobacter floral samples
+
+#### The reads are located at /local/workdir/vas75/metaspades_flowers/metagenomic/
+
+#### Vivi did not assemble all the reads so we will be doing so from scratch
+
+##### Vivi used Spades with the metagenomic settings
+
+#### Vivi later ran MetaPhlAn on a few samples for profiling communities with metagenomics data
+
+```{bash finding_files, eval = FALSE}
+#to start assembling the metagenomics data go to the folder with the raw reads /local/workdir/vas75/metaspades_flowers/metagenomic
+
+#then copy files to my directory 
+cp /local/workdir/vas75/metaspades_flowers/metagenomic /local/workdir/sna49/Hendry_Rotation_SA/Acinetobacter/Data
+
+#now the raw reads are in /Data/metaspades_floral/original_reads/og
+
+```
+
+```{bash first_multiqc, eval = FALSE}
+#in order to assess the quality of our reads and see what needs to be trimmed we must check the quality of our reads
+ls *.fastq.gz > samples.txt
+sed 's/\.fastq\.gz$//' samples.txt > samples1_test.txt #then i deleted the original file and renamed samples1.txt to samples.txt
+
+# Loop over the samples
+  for sample in $(cat /local/workdir/sna49/Hendry_Rotation_SA/Acinetobacter/Data/metaspades_floral/metagenomic/original_reads/og/samples1_test.txt)
+do
+	echo "Running fastqc on sample ${sample}"
+        fastqc $(echo ${sample}_R1.fastq.gz) -o ./
+	fastqc $(echo ${sample}_R2.fastq.gz) -o ./
+	echo "Finished fastqc on ${sample}"
+done
+
+# Run multiqc on all of the outputs from fastqc!
+export PYTHONPATH=/programs/multiqc-1.15/lib64/python3.9/site-packages:/programs/multiqc-1.15/lib/python3.9/site-packages
+export PATH=/programs/multiqc-1.15/bin:$PATH
+
+multiqc *_fastqc.zip
+```
+
+```{bash, trimmomatic, eval = FALSE}
+
+# Set the path to Trimmomatic JAR file
+trimmomatic_jar="/programs/trimmomatic/trimmomatic-0.39.jar"
+
+#important to note what primers do we have.. according to multiqc we have the nextera primers 
+    for f2 in *_R2.fastq.gz; do
+    f1="${f2%%_R2.fastq.gz}_R1.fastq.gz"
+    output_paired_1="paired.output_${f1}"
+    output_unpaired_1="unpaired.output_${f1}"
+    output_paired_2="paired.output_${f2}"
+    output_unpaired_2="unpaired.output_${f2}"
+    java -jar "$trimmomatic_jar" PE -phred33 "$f1" "$f2" \
+        "$output_paired_1" "$output_unpaired_1" "$output_paired_2" "$output_unpaired_2" \
+        ILLUMINACLIP:/programs/trimmomatic/adapters/NexteraPE-PE.fa:2:30:10 \
+        LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36
+done
+
+#note with these parameters it seems that 22FN020 R1 and R2 have issues so that one may need to be omitted
+```
+
+```{bash second_multiqc, eval = FALSE}
+# Purpose: Run fastqc on all *.fastq R1 and R2 sequence 
+# need file samples.txt with all samples
+ls *.fastq.gz > samples.txt
+sed 's/\.fastq\.gz$//' samples.txt > samples1_test.txt #then i deleted the original file and renamed samples1.txt to samples.txt
+
+# Loop over the samples
+  for sample in $(cat /local/workdir/sna49/Hendry_Rotation_SA/Acinetobacter/Data/metaspades_floral/metagenomic/original_reads/og/samples1_test.txt)
+do
+	echo "Running fastqc on sample ${sample}"
+        fastqc $(echo ${sample}_R1.fastq.gz) -o ./
+	fastqc $(echo ${sample}_R2.fastq.gz) -o ./
+	echo "Finished fastqc on ${sample}"
+done
+
+# Run multiqc on all of the outputs from fastqc
+export PYTHONPATH=/programs/multiqc-1.15/lib64/python3.9/site-packages:/programs/multiqc-1.15/lib/python3.9/site-packages
+export PATH=/programs/multiqc-1.15/bin:$PATH
+
+fastqc *_fastqc.zip
+
+
+/programs/FastQC-0.12.1/fastqc 
+export PATH=/programs/FastQC-0.12.1:$PATH
+```
+
+```{bash, fastqc_viv, eval = FALSE}
+# Purpose: Run fastqc on all *.fastq R1 and R2 sequence 
+# need file samples.txt with all samples
+ls *.fastq.gz > samples2.txt
+sed 's/\.fastq\.gz$//' samples2.txt > samples.txt 
+
+#now we will be using the paired.output files produced by trimmomatic but its annoying that the files begin with "paired.output_" so letse get rid of it
+for file in paired.output_*.fastq.gz; do
+    # Extract the part of the filename after "paired.output_"
+    name="${file#paired.output_}"
+    # renaming file
+    mv "$file" "$name"
+done
+
+#now lets run loop to multiqc to see if our trimming is better 
+for sample in $(cat /local/workdir/sna49/Hendry_Rotation_SA/Acinetobacter/Data/metaspades_floral/metagenomic/original_reads/og/trimmomatic_paired/samples1_test.txt)
+do
+	echo "Running fastqc on sample ${sample}"
+        fastqc $(echo ${sample}_R1.fastq.gz) -o ./
+	fastqc $(echo ${sample}_R2.fastq.gz) -o ./
+	echo "Finished fastqc on ${sample}"
+done
+
+
+# Run multiqc on all of the outputs from fastqc
+export PYTHONPATH=/programs/multiqc-1.15/lib64/python3.9/site-packages:/programs/multiqc-1.15/lib/python3.9/site-packages
+export PATH=/programs/multiqc-1.15/bin:$PATH
+
+multiqc *_fastqc.zip
+
+#i think the quality scores look good now? after consulting with the internet i think its fine?
+
+```
+
+
+```{bash spades, eval = FALSE}
+#now lets start from scratch and work with the R1 and R2 reads
+
+#There are 12 previous version(s) available. Any version can be accessed either by typing full path, or by adding it to the PATH and then typing its name at the prompt. NOTE: you need to set PATH only once per login/session. 
+#add to path
+export PATH=/programs/SPAdes-3.15.5/bin:$PATH
+
+
+#this is a test run 
+/programs/SPAdes-3.15.5/bin/spades.py -1 13702_32540_179738_H5MH5AFX5_metagenomic_mix_A06_22FN006_TAGGCATG_CTAGTCGA_R1.fastq.gz -2 13702_32540_179738_H5MH5AFX5_metagenomic_mix_A06_22FN006_TAGGCATG_CTAGTCGA_R2.fastq.gz -t 16 -m 200 -o /local/workdir/sna49/Hendry_Rotation_SA/Acinetobacter/Data/metaspades_floral/metagenomic/SPAdes_output
+#in this command
+  # -1 = file with forward reads
+  # -2 = file with reverse reads
+  # -t = threads sets the number of processors to use we are using 16 bc thats the default
+  # -m = memority limit in Gb. SPAdes terminates this if it reaches this limit so we are setting it to 200Gb to be safe but the default is 250 Gb
+  # -o = output directory to use the default is in the current directory
+
+
+#now that we have done the test run, lets do the whole set 
+
+#go to working directory 
+cd /local/workdir/sna49/Hendry_Rotation_SA/Acinetobacter/Data/metaspades_floral/metagenomic/original_reads/og/trimmomatic_paired
+#lets create a loop first 
+/programs/SPAdes-3.15.5/bin/spades.py -1 *_R1.fastq.gz -2 *_R2.fastq.gz -t 16 -m 200 -o /local/workdir/sna49/Hendry_Rotation_SA/Acinetobacter/Data/metaspades_floral/metagenomic/original_reads/og/trimmomatic_paired/SPAdes_output_trimmed
+
+
+for i in *R1.fastq.gz; do 
+  output_dir="${i%_R1.fastq.gz}_spades_output"
+  spades.py -1 $i -2 ${i/%R1.fastq.gz/R2.fastq.gz} -t 16 -m 200 -o "output_dir"
+done
+```
